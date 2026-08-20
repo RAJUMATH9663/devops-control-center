@@ -26,7 +26,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For production, restrict this to frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,3 +53,8 @@ app.include_router(websockets.router, prefix="/ws", tags=["websockets"])
 @app.get("/")
 def root():
     return {"message": "Welcome to DevOps Control Center API"}
+
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
+def health_check():
+    return {"status": "healthy", "service": "DevOps Control Center API", "version": "1.0.0"}
