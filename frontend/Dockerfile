@@ -1,13 +1,13 @@
 # Stage 1: Build the React application
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+# Copy package.json and install dependencies using clean install
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Copy source code and build
+# Copy source code and build production bundle
 COPY . .
 RUN npm run build
 
@@ -16,9 +16,6 @@ FROM nginx:alpine
 
 # Copy the build output to replace the default nginx contents
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom nginx configuration if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

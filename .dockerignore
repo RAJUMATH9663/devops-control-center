@@ -1,0 +1,15 @@
+node_modules/
+frontend/node_modules/
+backend/venv/
+venv/
+.venv/
+dist/
+frontend/dist/
+__pycache__/
+*.pyc
+.git
+.gitignore
+.env
+.env.local
+.terraform/
+*.tfstate*
