@@ -1,0 +1,29 @@
+groups:
+  - name: devops_control_center_alerts
+    rules:
+      - alert: BackendServiceDown
+        expr: up{job="devops-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DevOps Control Center Backend is down"
+          description: "Backend service instance {{ $labels.instance }} has been unreachable for more than 1 minute."
+
+      - alert: HighCpuUsage
+        expr: rate(container_cpu_usage_seconds_total{container_name=~"devops.*"}[5m]) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage in {{ $labels.container_name }}"
+          description: "CPU usage for container {{ $labels.container_name }} is above 85% for 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{container_name=~"devops.*"} / container_spec_memory_limit_bytes{container_name=~"devops.*"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory Usage in {{ $labels.container_name }}"
+          description: "Memory usage for container {{ $labels.container_name }} is above 90%."

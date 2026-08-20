@@ -1,0 +1,20 @@
+# Trivy Vulnerability Scanner Configuration
+scan:
+  security-checks:
+    - vuln
+    - config
+    - secret
+  timeout: 10m
+  severity:
+    - CRITICAL
+    - HIGH
+    - MEDIUM
+
+vulnerability:
+  ignore-unfixed: true
+
+secret:
+  enable: true
+
+format: table
+exit-code: 0

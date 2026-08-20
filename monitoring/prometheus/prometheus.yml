@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  # 1. Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # 2. DevOps Control Center Backend API
+  - job_name: "devops-backend"
+    metrics_path: "/api/v1/monitoring/metrics"
+    static_configs:
+      - targets: ["backend:8000"]
+    relabel_configs:
+      - target_label: environment
+        replacement: production
+
+  # 3. Node Exporter (Host Metrics)
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # 4. cAdvisor (Container Metrics)
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]

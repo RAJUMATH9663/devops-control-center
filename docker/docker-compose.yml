@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: devops_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: devops_control_center
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - devops-network
+
+  backend:
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: devops_backend
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/devops_control_center
+      - SECRET_KEY=super-secret-key-for-devops-control-center-change-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - devops-network
+
+  frontend:
+    build: 
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: devops_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - devops-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: devops_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - devops-network
+
+volumes:
+  postgres_data:
+
+networks:
+  devops-network:
+    driver: bridge

@@ -1,0 +1,45 @@
+---
+- name: Deploy DevOps Control Center Application
+  hosts: webservers
+  become: true
+  vars:
+    app_dir: /opt/devops-control-center
+    backend_image: devops-control-center-backend:latest
+    frontend_image: devops-control-center-frontend:latest
+
+  tasks:
+    - name: Ensure application directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose configuration
+      copy:
+        src: ../../docker/docker-compose.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Pull latest Docker images
+      command: docker compose pull
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Restart application containers with zero downtime
+      command: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Verify Backend health check endpoint
+      uri:
+        url: http://localhost:8000/
+        status_code: 200
+        return_content: yes
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 3
+
+    - name: Log deployment success
+      debug:
+        msg: "Application deployed successfully. Response: {{ result.json }}"

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-config
+  namespace: devops-control-center
+  labels:
+    app: devops-control-center
+data:
+  PROJECT_NAME: "DevOps Control Center"
+  API_V1_STR: "/api/v1"
+  POSTGRES_DB: "devops_control_center"
+  POSTGRES_USER: "postgres"
+  POSTGRES_PORT: "5432"
+  PROMETHEUS_URL: "http://prometheus-service.monitoring.svc.cluster.local:9090"

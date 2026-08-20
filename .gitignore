@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+venv/
+backend/venv/
+.venv/
+
+# Environment and Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Build and Compilation Artifacts
+dist/
+frontend/dist/
+build/
+__pycache__/
+backend/app/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+coverage/
+*.tsbuildinfo
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tmp
+.terraform/
+*.tfstate
+*.tfstate.*
