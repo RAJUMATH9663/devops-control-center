@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.init_db import init_db
-from app.api.v1 import auth, projects, deployments, github, jenkins, docker, kubernetes, terraform, ansible, monitoring, security, notifications, reports
+from app.api.v1 import auth, projects, deployments, github, jenkins, docker, kubernetes, terraform, ansible, monitoring, security, notifications, reports, ai
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ app.include_router(monitoring.router, prefix=f"{settings.API_V1_STR}/monitoring"
 app.include_router(security.router, prefix=f"{settings.API_V1_STR}/security", tags=["security"])
 app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags=["reports"])
+app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
 
 @app.get("/")
 def root():

@@ -149,6 +149,40 @@ def run_all_tests():
             assert res.status_code == 200, f"Failed on {ep}: {res.text}"
     tests.append(("Integrations: All DevOps tool endpoints respond 200 OK", test_integrations_endpoints))
 
+    # 5. AI Assistant Tests
+    def test_ai_log_analyzer():
+        oom_log = "Error: Out of memory (OOMKilled), exit code 137"
+        res = client.post("/api/v1/ai/analyze-logs", headers=dev_headers, json={"log_text": oom_log})
+        assert res.status_code == 200, res.text
+        assert res.json()["severity"] == "CRITICAL"
+
+        rec_res = client.get("/api/v1/ai/recommendations", headers=dev_headers)
+        assert rec_res.status_code == 200, rec_res.text
+        assert len(rec_res.json()) >= 1
+    tests.append(("AI Assistant: Log analyzer and recommendations", test_ai_log_analyzer))
+
+    # 6. Notifications Tests
+    def test_notifications():
+        res = client.post(
+            "/api/v1/notifications/test",
+            headers=dev_headers,
+            json={"channel_type": "slack", "target": "https://hooks.slack.com/services/test", "title": "Test Alert"}
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] in ["delivered", "failed"]
+    tests.append(("Notifications: Dispatch test alert", test_notifications))
+
+    # 7. Reports & DORA Metrics Tests
+    def test_reports():
+        dora_res = client.get("/api/v1/reports/dora", headers=dev_headers)
+        assert dora_res.status_code == 200, dora_res.text
+        assert "overall_tier" in dora_res.json()
+
+        csv_res = client.get("/api/v1/reports/export/deployments", headers=dev_headers)
+        assert csv_res.status_code == 200, csv_res.text
+        assert "text/csv" in csv_res.headers["content-type"]
+    tests.append(("Reports: DORA metrics and CSV deployment exports", test_reports))
+
     # Run tests
     passed = 0
     failed = 0

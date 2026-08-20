@@ -5,15 +5,22 @@ import {
   cancelJenkinsBuild, getJenkinsLogs 
 } from '../services/jenkins';
 import type { JenkinsJob } from '../services/jenkins';
+import { analyzeLogsWithAI, type LogAnalysisResponse } from '../services/ai';
 import { 
   TerminalSquare, Play, Clock, CheckCircle2, 
-  XCircle, AlertCircle, Loader2, StopCircle, AlignLeft 
+  XCircle, AlertCircle, Loader2, StopCircle, AlignLeft,
+  Sparkles, Wrench, Terminal, Copy, Check
 } from 'lucide-react';
 
 const JenkinsIntegration = () => {
   const queryClient = useQueryClient();
   const [selectedJob, setSelectedJob] = useState<JenkinsJob | null>(null);
   const [selectedBuild, setSelectedBuild] = useState<number | null>(null);
+
+  // AI Analysis State
+  const [aiAnalysis, setAiAnalysis] = useState<LogAnalysisResponse | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const { data: jobs, isLoading: jobsLoading } = useQuery(['jenkins-jobs'], getJenkinsJobs);
 
@@ -26,27 +33,46 @@ const JenkinsIntegration = () => {
   const { data: logData, isLoading: logsLoading } = useQuery(
     ['jenkins-logs', selectedJob?.name, selectedBuild],
     () => getJenkinsLogs(selectedJob!.name, selectedBuild!),
-    { enabled: !!selectedJob && !!selectedBuild }
+    { 
+      enabled: !!selectedJob && !!selectedBuild,
+      onSuccess: () => setAiAnalysis(null)
+    }
   );
 
-  const triggerMutation = useMutation(triggerJenkinsBuild, {
-    onSuccess: () => refreshQueries()
+  const triggerMutation = useMutation((name: string) => triggerJenkinsBuild(name), {
+    onSuccess: () => queryClient.invalidateQueries(['jenkins-builds', selectedJob?.name])
   });
 
   const cancelMutation = useMutation(
-    ({ jobName, buildNum }: { jobName: string, buildNum: number }) => cancelJenkinsBuild(jobName, buildNum),
-    { onSuccess: () => refreshQueries() }
+    ({ jobName, buildNum }: { jobName: string, buildNum: number }) => cancelJenkinsBuild(jobName, buildNum), 
+    {
+      onSuccess: () => queryClient.invalidateQueries(['jenkins-builds', selectedJob?.name])
+    }
   );
 
-  const refreshQueries = () => {
-    queryClient.invalidateQueries(['jenkins-jobs']);
-    if (selectedJob) queryClient.invalidateQueries(['jenkins-builds', selectedJob.name]);
+  const handleAnalyzeWithAI = async () => {
+    if (!logData?.logs) return;
+    try {
+      setIsAnalyzing(true);
+      const res = await analyzeLogsWithAI(logData.logs, selectedJob?.name);
+      setAiAnalysis(res);
+    } catch (e) {
+      console.error("AI log analysis failed", e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleCopyCommand = (cmd: string, index: number) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch(status) {
       case 'SUCCESS': return <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full font-medium">Success</span>;
-      case 'FAILURE': return <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full font-medium">Failed</span>;
+      case 'FAILURE': return <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full font-medium">Failure</span>;
       case 'BUILDING': return <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full font-medium">Building</span>;
       case 'ABORTED': return <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 text-xs rounded-full font-medium">Aborted</span>;
       default: return <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 text-xs rounded-full font-medium">Unknown</span>;
@@ -61,7 +87,7 @@ const JenkinsIntegration = () => {
             <TerminalSquare className="w-6 h-6 mr-3 text-brand-500" />
             Advanced Jenkins Pipelines
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor, trigger, cancel, and view console logs for your CI/CD pipelines.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor, trigger, cancel, and diagnose console logs with AI.</p>
         </div>
       </div>
 
@@ -77,7 +103,7 @@ const JenkinsIntegration = () => {
             ) : jobs?.map((job) => (
               <div 
                 key={job.name} 
-                onClick={() => { setSelectedJob(job); setSelectedBuild(null); }}
+                onClick={() => { setSelectedJob(job); setSelectedBuild(null); setAiAnalysis(null); }}
                 className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedJob?.name === job.name ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/10' : 'border-slate-200 dark:border-dark-border hover:border-brand-300 dark:hover:border-brand-700'}`}
               >
                 <div className="flex justify-between items-start">
@@ -118,20 +144,88 @@ const JenkinsIntegration = () => {
               </div>
 
               {selectedBuild ? (
-                // Console Log View
-                <div className="p-6 flex-1 flex flex-col overflow-hidden">
-                  <div className="flex justify-between items-center mb-4">
+                // Console Log & AI View
+                <div className="p-6 flex-1 flex flex-col overflow-hidden space-y-4">
+                  <div className="flex justify-between items-center">
                     <h3 className="font-medium flex items-center">
                       <AlignLeft className="w-5 h-5 mr-2 text-slate-400" /> 
                       Console Output for Build #{selectedBuild}
                     </h3>
-                    <button 
-                      onClick={() => setSelectedBuild(null)}
-                      className="text-sm text-brand-500 hover:underline"
-                    >
-                      &larr; Back to History
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={handleAnalyzeWithAI}
+                        disabled={isAnalyzing || logsLoading}
+                        className="flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {isAnalyzing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                        Analyze with AI
+                      </button>
+                      <button 
+                        onClick={() => { setSelectedBuild(null); setAiAnalysis(null); }}
+                        className="text-sm text-brand-500 hover:underline"
+                      >
+                        &larr; Back to History
+                      </button>
+                    </div>
                   </div>
+
+                  {/* AI Diagnosis Card if generated */}
+                  {aiAnalysis && (
+                    <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          <h4 className="font-semibold text-purple-900 dark:text-purple-200 text-sm">
+                            AI Failure Diagnosis: {aiAnalysis.summary}
+                          </h4>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                          aiAnalysis.severity === 'CRITICAL' ? 'bg-red-200 text-red-800' :
+                          aiAnalysis.severity === 'HIGH' ? 'bg-amber-200 text-amber-800' :
+                          'bg-blue-200 text-blue-800'
+                        }`}>
+                          {aiAnalysis.severity} ({aiAnalysis.confidence})
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-800 dark:text-purple-300">
+                        {aiAnalysis.root_cause}
+                      </p>
+                      {aiAnalysis.suggested_fixes.length > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-xs font-semibold text-purple-900 dark:text-purple-200 flex items-center">
+                            <Wrench className="w-3.5 h-3.5 mr-1" /> Remediation Steps:
+                          </span>
+                          <ul className="list-disc list-inside text-xs text-purple-700 dark:text-purple-300 space-y-0.5 pl-2">
+                            {aiAnalysis.suggested_fixes.map((fix, idx) => (
+                              <li key={idx}>{fix}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {aiAnalysis.fix_commands.length > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-xs font-semibold text-purple-900 dark:text-purple-200 flex items-center">
+                            <Terminal className="w-3.5 h-3.5 mr-1" /> Fix Commands:
+                          </span>
+                          <div className="space-y-1">
+                            {aiAnalysis.fix_commands.map((cmd, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-slate-900 text-green-400 px-3 py-1.5 rounded font-mono text-xs">
+                                <span>{cmd}</span>
+                                <button
+                                  onClick={() => handleCopyCommand(cmd, idx)}
+                                  className="text-slate-400 hover:text-white"
+                                  title="Copy command"
+                                >
+                                  {copiedIndex === idx ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex-1 bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-y-auto whitespace-pre-wrap shadow-inner border border-slate-800">
                     {logsLoading ? 'Fetching logs...' : logData?.logs || 'No logs available.'}
                   </div>
