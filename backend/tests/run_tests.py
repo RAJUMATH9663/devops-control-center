@@ -299,6 +299,24 @@ def run_all_tests():
         assert pwd_res.status_code == 200, pwd_res.text
     tests.append(("Observability & Profile: Prometheus telemetry, alerts, profile and password change", test_observability_and_profile))
 
+    # 13. SonarQube SAST & Trivy Security Scanners Tests
+    def test_security_scanners():
+        # SonarQube
+        sonar_res = client.get("/api/v1/security/sonarqube/status", headers=dev_headers)
+        assert sonar_res.status_code == 200, sonar_res.text
+        assert sonar_res.json()["quality_gate"] == "PASSED"
+
+        # Trivy
+        trivy_res = client.post("/api/v1/security/trivy/scan?target=repo", headers=dev_headers)
+        assert trivy_res.status_code == 200, trivy_res.text
+        assert trivy_res.json()["status"] == "COMPLETED"
+
+        # Compliance
+        comp_res = client.get("/api/v1/security/compliance", headers=dev_headers)
+        assert comp_res.status_code == 200, comp_res.text
+        assert comp_res.json()["grade"] == "A+"
+    tests.append(("Security Scanners: SonarQube quality gate, Trivy CVE scan, and CIS compliance", test_security_scanners))
+
     # Run tests
     passed = 0
     failed = 0
