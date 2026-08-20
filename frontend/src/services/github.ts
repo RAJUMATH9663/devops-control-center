@@ -45,6 +45,16 @@ export interface GitHubIssue {
   created_at: string;
 }
 
+export interface WebhookDelivery {
+  id: string;
+  event: string;
+  repository: string;
+  sender: string;
+  status: string;
+  timestamp: string;
+  actions_triggered: string[];
+}
+
 export const getRepositories = async (): Promise<GitHubRepository[]> => {
   const response = await api.get('/github/repositories');
   return response.data;
@@ -62,5 +72,10 @@ export const getPullRequests = async (owner: string, repo: string): Promise<GitH
 
 export const getIssues = async (owner: string, repo: string): Promise<GitHubIssue[]> => {
   const response = await api.get(`/github/${owner}/${repo}/issues`);
+  return response.data;
+};
+
+export const getWebhookHistory = async (): Promise<WebhookDelivery[]> => {
+  const response = await api.get<WebhookDelivery[]>('/github/webhooks/history');
   return response.data;
 };

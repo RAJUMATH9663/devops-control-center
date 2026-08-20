@@ -215,6 +215,35 @@ def run_all_tests():
         assert res_bc.json()["status"] == "broadcast_sent"
     tests.append(("Audit & WebSockets: Audit event recording and log broadcast", test_audit_and_websockets))
 
+    # 10. GitHub Webhooks & K8s Operations Tests
+    def test_webhooks_and_k8s():
+        import hmac
+        import hashlib
+        import json
+
+        # Webhook with HMAC
+        secret = "devops-github-webhook-secret-key-12345"
+        payload = {"ref": "refs/heads/main", "after": "0ebab5f", "repository": {"full_name": "RAJUMATH9663/devops-control-center"}}
+        body = json.dumps(payload).encode("utf-8")
+        sig = "sha256=" + hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        wh_res = client.post("/api/v1/github/webhook", data=body, headers={"Content-Type": "application/json", "X-GitHub-Event": "push", "X-Hub-Signature-256": sig})
+        assert wh_res.status_code == 200, wh_res.text
+        assert wh_res.json()["status"] == "PROCESSED"
+
+        # K8s Scale
+        scale_res = client.post("/api/v1/kubernetes/deployments/devops-backend/scale", headers=dev_headers, json={"replicas": 3})
+        assert scale_res.status_code == 200, scale_res.text
+        assert scale_res.json()["current_replicas"] == 3
+
+        # K8s Pod Restart & Logs
+        restart_res = client.post("/api/v1/kubernetes/pods/devops-backend-7c598d9f4-k8w2q/restart", headers=dev_headers)
+        assert restart_res.status_code == 200, restart_res.text
+
+        log_res = client.get("/api/v1/kubernetes/pods/devops-backend-7c598d9f4-k8w2q/logs", headers=dev_headers)
+        assert log_res.status_code == 200, log_res.text
+        assert "logs" in log_res.json()
+    tests.append(("Webhooks & K8s: HMAC Webhooks, replica scaling, pod restart & logs", test_webhooks_and_k8s))
+
     # Run tests
     passed = 0
     failed = 0

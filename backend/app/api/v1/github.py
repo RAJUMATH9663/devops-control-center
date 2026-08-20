@@ -1,10 +1,10 @@
 import os
-from typing import Any, List, Dict
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from typing import Any, List, Dict, Optional
+from fastapi import APIRouter, Depends, Header, Request, HTTPException
 import httpx
 from app.api import deps
 from app.models.user import User
+from app.services.webhook_dispatcher import webhook_dispatcher
 
 router = APIRouter()
 
@@ -35,14 +35,25 @@ def get_github_repositories(
     return [
         {
             "id": 1,
-            "name": "backend-core-service",
-            "full_name": "acme-corp/backend-core-service",
-            "language": "Python",
-            "stargazers_count": 12,
+            "name": "devops-control-center",
+            "full_name": "RAJUMATH9663/devops-control-center",
+            "language": "TypeScript / Python",
+            "stargazers_count": 48,
+            "private": False,
+            "default_branch": "main",
+            "clone_url": "https://github.com/RAJUMATH9663/devops-control-center.git",
+            "ssh_url": "git@github.com:RAJUMATH9663/devops-control-center.git"
+        },
+        {
+            "id": 2,
+            "name": "microservices-infra",
+            "full_name": "RAJUMATH9663/microservices-infra",
+            "language": "HCL (Terraform)",
+            "stargazers_count": 19,
             "private": True,
             "default_branch": "main",
-            "clone_url": "https://github.com/acme-corp/backend-core-service.git",
-            "ssh_url": "git@github.com:acme-corp/backend-core-service.git"
+            "clone_url": "https://github.com/RAJUMATH9663/microservices-infra.git",
+            "ssh_url": "git@github.com:RAJUMATH9663/microservices-infra.git"
         }
     ]
 
@@ -62,13 +73,19 @@ def get_github_commits(
             if response.status_code == 200:
                 return response.json()
                 
-    # Fallback mock data
     return [
         {
-            "sha": "a1b2c3d4",
+            "sha": "0ebab5f",
             "commit": {
-                "message": f"Update dependencies for {repo}",
-                "author": {"name": "Alice Engineer", "date": "2026-08-07T10:00:00Z"}
+                "message": "feat: implement service layer, AI log analyzer, notification dispatchers, CSV export",
+                "author": {"name": "DevOps Engineer", "date": "2026-08-20T13:33:53Z"}
+            }
+        },
+        {
+            "sha": "bebfaaa",
+            "commit": {
+                "message": "feat: complete DevOps Control Center initial release with full stack, k8s, terraform",
+                "author": {"name": "DevOps Engineer", "date": "2026-08-20T13:28:29Z"}
             }
         }
     ]
@@ -89,15 +106,14 @@ def get_github_pulls(
             if response.status_code == 200:
                 return response.json()
                 
-    # Fallback mock data
     return [
         {
             "id": 101,
             "number": 42,
             "state": "open",
-            "title": "Feature: Advanced Caching",
-            "user": {"login": "bob-dev"},
-            "created_at": "2026-08-06T14:30:00Z"
+            "title": "feat: Automated HashiCorp Vault Secret Rotation",
+            "user": {"login": "devops-lead"},
+            "created_at": "2026-08-20T11:30:00Z"
         }
     ]
 
@@ -117,24 +133,46 @@ def get_github_issues(
             if response.status_code == 200:
                 return response.json()
                 
-    # Fallback mock data
     return [
         {
             "id": 202,
             "number": 15,
             "state": "open",
-            "title": "Bug: Memory leak in background worker",
-            "user": {"login": "alice-eng"},
-            "created_at": "2026-08-05T09:15:00Z"
+            "title": "Enhancement: Add Grafana Loki log aggregation widget",
+            "user": {"login": "developer"},
+            "created_at": "2026-08-19T09:15:00Z"
         }
     ]
 
 @router.post("/webhook")
-def receive_github_webhook(
-    payload: Dict[str, Any],
+async def receive_github_webhook(
+    request: Request,
+    x_github_event: Optional[str] = Header("push"),
+    x_hub_signature_256: Optional[str] = Header(None),
 ):
     """
-    Receive GitHub webhook payload (simulated).
+    Ingests and validates GitHub webhooks with HMAC-SHA256 signature verification.
     """
-    print(f"Received webhook: {payload.get('action', 'unknown')}")
-    return {"status": "success", "message": "Webhook received"}
+    body_bytes = await request.body()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    # If signature is provided, verify it
+    if x_hub_signature_256:
+        is_valid = webhook_dispatcher.verify_signature(body_bytes, x_hub_signature_256)
+        if not is_valid:
+            raise HTTPException(status_code=401, detail="Invalid X-Hub-Signature-256 HMAC signature.")
+
+    event_result = webhook_dispatcher.process_event(x_github_event or "push", payload)
+    return event_result
+
+@router.get("/webhooks/history")
+def get_webhook_deliveries(
+    current_user: User = Depends(deps.get_current_active_user),
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve history of received and processed GitHub webhooks.
+    """
+    return webhook_dispatcher.get_history()
