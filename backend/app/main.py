@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.init_db import init_db
-from app.api.v1 import auth, projects, deployments, github, jenkins, docker, kubernetes, terraform, ansible, monitoring, security, notifications, reports, ai
+from app.api.v1 import auth, projects, deployments, github, jenkins, docker, kubernetes, terraform, ansible, monitoring, security, notifications, reports, ai, websockets, secrets
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,8 @@ app.include_router(security.router, prefix=f"{settings.API_V1_STR}/security", ta
 app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags=["reports"])
 app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["ai"])
+app.include_router(secrets.router, prefix=f"{settings.API_V1_STR}/secrets", tags=["secrets"])
+app.include_router(websockets.router, prefix="/ws", tags=["websockets"])
 
 @app.get("/")
 def root():

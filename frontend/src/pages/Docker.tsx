@@ -9,6 +9,7 @@ import {
   Container, Play, Square, RotateCw, Trash2, 
   Box, HardDrive, Network, TerminalSquare, X
 } from 'lucide-react';
+import { LogTerminal } from '../components/common/LogTerminal';
 
 const DockerIntegration = () => {
   const queryClient = useQueryClient();
@@ -199,20 +200,20 @@ const DockerIntegration = () => {
 
       {/* Logs Modal Overlay */}
       {logsModalOpen && selectedContainer && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-lg">
-          <div className="bg-slate-900 w-3/4 h-3/4 rounded-lg shadow-2xl flex flex-col border border-slate-700 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-950">
-              <h3 className="text-white font-mono text-sm flex items-center">
-                <TerminalSquare className="w-4 h-4 mr-2 text-slate-400" />
-                {selectedContainer.name} logs
-              </h3>
-              <button onClick={() => setLogsModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto text-green-400 font-mono text-xs whitespace-pre-wrap">
-              {logsLoading ? 'Loading logs streaming output...' : logData?.logs}
-            </div>
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg p-6">
+          <div className="w-full h-full max-w-5xl rounded-lg shadow-2xl flex flex-col overflow-hidden relative">
+            <button 
+              onClick={() => setLogsModalOpen(false)} 
+              className="absolute top-2.5 right-3 z-30 text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+              title="Close terminal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <LogTerminal 
+              logs={logsLoading ? 'Connecting to live container log stream...' : logData?.logs || 'No container logs available.'} 
+              title={`${selectedContainer.name} (${selectedContainer.image})`}
+              isStreaming={selectedContainer.status === 'running'}
+            />
           </div>
         </div>
       )}

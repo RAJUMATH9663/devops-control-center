@@ -183,6 +183,38 @@ def run_all_tests():
         assert "text/csv" in csv_res.headers["content-type"]
     tests.append(("Reports: DORA metrics and CSV deployment exports", test_reports))
 
+    # 8. Vault Secrets & Masking Tests
+    def test_vault_and_masking():
+        # List paths
+        res_paths = client.get("/api/v1/secrets/paths", headers=dev_headers)
+        assert res_paths.status_code == 200, res_paths.text
+        assert "secret/data/production/database" in res_paths.json()
+
+        # View secret
+        res_view = client.get("/api/v1/secrets/view?path=secret/data/production/database", headers=dev_headers)
+        assert res_view.status_code == 200, res_view.text
+        assert "••••" in str(res_view.json()["masked_data"]["password"])
+
+        # Masking test
+        raw_token = "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        res_mask = client.post("/api/v1/secrets/mask-test", headers=dev_headers, json={"text": raw_token})
+        assert res_mask.status_code == 200, res_mask.text
+        assert "[MASKED_" in res_mask.json()["masked"]
+    tests.append(("Vault & Security: Secret storage and automated masking", test_vault_and_masking))
+
+    # 9. Audit Logging & WebSockets Tests
+    def test_audit_and_websockets():
+        # Audit trail
+        res_audit = client.get("/api/v1/secrets/audit", headers=dev_headers)
+        assert res_audit.status_code == 200, res_audit.text
+        assert isinstance(res_audit.json(), list)
+
+        # WebSocket broadcast
+        res_bc = client.post("/ws/broadcast/test-pipe", json={"text": "Pipeline log line", "level": "info"})
+        assert res_bc.status_code == 200, res_bc.text
+        assert res_bc.json()["status"] == "broadcast_sent"
+    tests.append(("Audit & WebSockets: Audit event recording and log broadcast", test_audit_and_websockets))
+
     # Run tests
     passed = 0
     failed = 0
