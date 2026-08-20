@@ -1,18 +1,29 @@
 import api from './api';
 
 export interface SystemMetrics {
-  cpu_usage: number;
-  memory_usage: number;
-  active_connections: number;
-  error_rate: number;
+  cpu_usage: string;
+  cpu_value: number;
+  memory_usage: string;
+  memory_value: number;
+  disk_usage: string;
+  disk_value: number;
+  request_rate: string;
+  p95_latency: string;
+  network_in: string;
+  network_out: string;
+  containers_healthy: number;
+  containers_total: number;
+  timestamp: string;
 }
 
 export interface SystemAlert {
   id: string;
-  severity: 'critical' | 'warning' | 'info';
+  severity: 'critical' | 'warning' | 'info' | string;
   name: string;
-  target: string;
-  started_at: string;
+  expr?: string;
+  for?: string;
+  status: string;
+  description: string;
 }
 
 export interface SystemLog {

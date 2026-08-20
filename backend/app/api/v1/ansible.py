@@ -1,51 +1,60 @@
 from typing import Any, List, Dict
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api import deps
 from app.models.user import User
-import time
+from app.services.ansible_service import ansible_service
 
 router = APIRouter()
-
-MOCK_JOBS = []
 
 @router.get("/inventories")
 def get_ansible_inventories(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> List[Dict[str, Any]]:
-    return [
-        {"id": 1, "name": "Production Web Servers", "hosts": 12, "source": "aws_ec2"},
-        {"name": "Staging DB Cluster", "hosts": 3, "source": "static"},
-        {"name": "Global Load Balancers", "hosts": 2, "source": "gcp_compute"},
-    ]
+    """
+    List Ansible host inventories.
+    """
+    return ansible_service.get_inventories()
 
 @router.get("/playbooks")
 def get_ansible_playbooks(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> List[Dict[str, Any]]:
-    return [
-        {"id": 101, "name": "Update OS Packages", "description": "Runs apt/yum update and upgrade on all hosts."},
-        {"id": 102, "name": "Deploy Nginx Config", "description": "Pushes latest nginx.conf and reloads service."},
-        {"id": 103, "name": "Rotate SSH Keys", "description": "Rotates authorized_keys for service accounts."},
-    ]
+    """
+    List available Ansible playbooks.
+    """
+    return ansible_service.get_playbooks()
 
 @router.get("/jobs")
 def get_ansible_jobs(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> List[Dict[str, Any]]:
-    return MOCK_JOBS
+    """
+    List past and current Ansible execution jobs.
+    """
+    return ansible_service.get_jobs()
 
 @router.post("/playbooks/{id}/execute")
 def execute_ansible_playbook(
     id: int,
-    inventory_id: int,
+    inventory_id: int = Query(...),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Dict[str, Any]:
-    new_job = {
-        "id": f"job-{int(time.time())}",
-        "playbook_id": id,
-        "inventory_id": inventory_id,
-        "status": "running",
-        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
-    MOCK_JOBS.insert(0, new_job)
-    return {"message": "Playbook execution started", "job": new_job}
+    """
+    Execute an Ansible playbook against an inventory.
+    """
+    try:
+        job = ansible_service.execute_playbook(id, inventory_id, current_user.email)
+        return {"message": "Playbook execution started", "job": job}
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/jobs/{id}/logs")
+def get_ansible_job_logs(
+    id: int,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    Stream live execution logs for an Ansible job.
+    """
+    logs = ansible_service.get_job_logs(id)
+    return {"job_id": id, "logs": logs}

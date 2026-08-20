@@ -1,4 +1,6 @@
 from datetime import timedelta
+from typing import Optional
+from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -12,6 +14,14 @@ from app.schemas.token import Token, ForgotPassword, ResetPassword
 from jose import jwt, JWTError
 
 router = APIRouter()
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 @router.post("/login", response_model=Token)
 def login_access_token(
@@ -76,6 +86,46 @@ def read_users_me(
     """
     return current_user
 
+@router.put("/profile", response_model=UserResponse)
+def update_user_profile(
+    profile_in: ProfileUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """
+    Update current user profile.
+    """
+    if profile_in.email and profile_in.email != current_user.email:
+        existing = db.query(User).filter(User.email == profile_in.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered by another user.")
+        current_user.email = profile_in.email
+
+    if profile_in.full_name is not None:
+        current_user.full_name = profile_in.full_name
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.put("/change-password")
+def change_password(
+    password_in: ChangePasswordRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """
+    Change password for logged-in user.
+    """
+    if not security.verify_password(password_in.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password does not match.")
+
+    current_user.hashed_password = security.get_password_hash(password_in.new_password)
+    db.add(current_user)
+    db.commit()
+    return {"message": "Password changed successfully."}
+
 @router.post("/refresh-token", response_model=Token)
 def refresh_token(
     refresh_token: str, db: Session = Depends(deps.get_db)
@@ -119,7 +169,6 @@ def forgot_password(
     user = db.query(User).filter(User.email == form.email).first()
     if user:
         reset_token = security.create_access_token(user.id, expires_delta=timedelta(hours=1))
-        # MOCK SEND EMAIL
         print(f"--- MOCK EMAIL ---")
         print(f"To: {user.email}")
         print(f"Subject: Password Reset Request")

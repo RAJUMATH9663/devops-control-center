@@ -244,6 +244,61 @@ def run_all_tests():
         assert "logs" in log_res.json()
     tests.append(("Webhooks & K8s: HMAC Webhooks, replica scaling, pod restart & logs", test_webhooks_and_k8s))
 
+    # 11. Terraform & Ansible Live Runners Tests
+    def test_terraform_and_ansible():
+        # Terraform plan
+        tf_plan = client.post("/api/v1/terraform/workspaces/aws-production-vpc-eks/plan", headers=dev_headers)
+        assert tf_plan.status_code == 200, tf_plan.text
+        assert "run" in tf_plan.json()
+        run_id = tf_plan.json()["run"]["id"]
+
+        # Terraform state
+        tf_state = client.get("/api/v1/terraform/workspaces/aws-production-vpc-eks/state", headers=dev_headers)
+        assert tf_state.status_code == 200, tf_state.text
+        assert "outputs" in tf_state.json()
+
+        # Terraform logs
+        tf_logs = client.get(f"/api/v1/terraform/runs/{run_id}/logs", headers=dev_headers)
+        assert tf_logs.status_code == 200, tf_logs.text
+
+        # Ansible execute
+        ans_exec = client.post("/api/v1/ansible/playbooks/1/execute?inventory_id=1", headers=dev_headers)
+        assert ans_exec.status_code == 200, ans_exec.text
+        assert "job" in ans_exec.json()
+        job_id = ans_exec.json()["job"]["id"]
+
+        # Ansible logs
+        ans_logs = client.get(f"/api/v1/ansible/jobs/{job_id}/logs", headers=dev_headers)
+        assert ans_logs.status_code == 200, ans_logs.text
+        assert "PLAY" in ans_logs.json()["logs"]
+    tests.append(("Terraform & Ansible: Plan, apply, state inspection, and playbook execution", test_terraform_and_ansible))
+
+    # 12. Observability & User Profile Tests
+    def test_observability_and_profile():
+        # Metrics
+        met_res = client.get("/api/v1/monitoring/metrics", headers=dev_headers)
+        assert met_res.status_code == 200, met_res.text
+        assert "cpu_usage" in met_res.json()
+
+        # Alerts
+        alt_res = client.get("/api/v1/monitoring/alerts", headers=dev_headers)
+        assert alt_res.status_code == 200, alt_res.text
+        assert len(alt_res.json()) >= 1
+
+        # Profile update
+        prof_res = client.put("/api/v1/auth/profile", headers=dev_headers, json={"full_name": "DevOps Architect"})
+        assert prof_res.status_code == 200, prof_res.text
+        assert prof_res.json()["full_name"] == "DevOps Architect"
+
+        # Password change
+        pwd_res = client.put(
+            "/api/v1/auth/change-password",
+            headers=dev_headers,
+            json={"current_password": "testpassword123", "new_password": "newsecretpassword123"}
+        )
+        assert pwd_res.status_code == 200, pwd_res.text
+    tests.append(("Observability & Profile: Prometheus telemetry, alerts, profile and password change", test_observability_and_profile))
+
     # Run tests
     passed = 0
     failed = 0
